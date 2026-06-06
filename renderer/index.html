@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src http://127.0.0.1:*" />
+    <title>Postie</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-name">Postie</span>
+      </div>
+      <button id="sidebar-toggle" class="ghost" title="Toggle sidebar">☰</button>
+      <div class="env-bar">
+        <label>Environment</label>
+        <select id="env-select"><option value="">No environment</option></select>
+        <button id="manage-environments" class="ghost" title="Manage environments">⚙</button>
+        <button id="layout-toggle" class="ghost" title="Toggle side-by-side layout">⇆</button>
+        <button id="settings-btn" class="ghost" title="Settings">Settings</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="tabs side-tabs">
+          <button class="tab active" data-side="collections">Collections</button>
+          <button class="tab" data-side="history">History</button>
+        </div>
+        <div id="side-collections" class="side-pane active">
+          <button id="new-collection" class="primary block">+ New Collection</button>
+          <ul id="collections-list" class="tree"></ul>
+        </div>
+        <div id="side-history" class="side-pane">
+          <button id="clear-history" class="ghost block">Clear history</button>
+          <ul id="history-list" class="tree"></ul>
+        </div>
+      </aside>
+
+      <section class="workbench">
+        <div class="tab-bar">
+          <div id="request-tabs" class="request-tabs"></div>
+        </div>
+
+        <!-- Welcome / home screen, shown when no tabs are open -->
+        <div id="welcome-screen" class="welcome hidden">
+          <div class="welcome-inner">
+            <div class="welcome-hero">
+              <div class="welcome-logo">Postie</div>
+              <h1>Welcome to Postie</h1>
+              <p class="welcome-tagline">A fast, local-first API client. Inspired by Postman, built with Electron and Rust.</p>
+              <div class="welcome-actions">
+                <button id="welcome-new" class="primary">+ New Request</button>
+                <button id="welcome-import" class="ghost">Import Postman Collection</button>
+                <button id="welcome-shortcuts" class="ghost">View Shortcuts (?)</button>
+              </div>
+            </div>
+
+            <div class="welcome-features">
+              <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>All HTTP methods</h3>
+                <p>GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS — full request control with headers, query params, and multiple body types.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3>Authorization</h3>
+                <p>Built-in support for Basic Auth, Bearer Token, and API Keys (as headers or query params). Auth never leaks into your saved headers.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <h3>Environments</h3>
+                <p>Define <code>{{baseUrl}}</code>-style variables and switch between dev / qa / prod with one dropdown.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">📁</div>
+                <h3>Collections &amp; History</h3>
+                <p>Organize requests into collections, drag to resize, rename via right-click, and revisit anything from the auto-tracked history.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">📥</div>
+                <h3>Postman &amp; cURL Import</h3>
+                <p>Import Postman v2.1 collections and environments. Paste a curl command into the URL bar — Postie parses method, headers, body, and auth.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">🧩</div>
+                <h3>Body editors</h3>
+                <p>JSON, XML, HTML, JavaScript, raw text, x-www-form-urlencoded, multipart form-data with file uploads, and binary file bodies — all syntax-highlighted.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">⌨️</div>
+                <h3>Keyboard-first</h3>
+                <p><kbd>⌘/Ctrl + Enter</kbd> Send · <kbd>⌘/Ctrl + T</kbd> New tab · <kbd>⌘/Ctrl + S</kbd> Save · <kbd>?</kbd> for the full list.</p>
+              </div>
+              <div class="feature-card">
+                <div class="feature-icon">🪶</div>
+                <h3>Local-first &amp; private</h3>
+                <p>No accounts, no cloud, no telemetry. Your workspace lives in a single JSON file on your machine.</p>
+              </div>
+            </div>
+
+            <div class="welcome-footer">
+              <span>Press <kbd>?</kbd> any time to see all keyboard shortcuts.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="url-row">
+          <select id="method" class="method">
+            <option>GET</option><option>POST</option><option>PUT</option>
+            <option>PATCH</option><option>DELETE</option><option>HEAD</option>
+            <option>OPTIONS</option>
+          </select>
+          <input id="url" class="url" placeholder="Enter URL or paste a curl command…" spellcheck="false" />
+          <button id="send" class="primary">Send</button>
+          <button id="save" class="ghost">Save</button>
+          <button id="copy-curl" class="ghost" title="Copy as curl">Copy as cURL</button>
+        </div>
+
+        <div class="request-panel" id="request-panel">
+        <div class="tabs">
+          <button class="tab active" data-tab="params">Params</button>
+          <button class="tab" data-tab="auth">Authorization</button>
+          <button class="tab" data-tab="headers">Headers</button>
+          <button class="tab" data-tab="body">Body</button>
+          <button class="tab" data-tab="tests">Tests</button>
+        </div>
+
+        <div id="tab-params" class="pane active">
+          <div class="kv-toolbar">
+            <div class="grow"></div>
+            <button class="ghost bulk-edit-toggle" data-bulk="params">Bulk Edit</button>
+          </div>
+          <div class="kv-table-view" data-view="params-table">
+            <table class="kv">
+              <thead><tr><th></th><th>Key</th><th>Value</th><th>Description</th><th></th></tr></thead>
+              <tbody id="params-body"></tbody>
+            </table>
+            <button class="ghost" data-add="params">+ Add</button>
+          </div>
+          <textarea class="kv-bulk-textarea hidden" data-bulk-text="params" placeholder="key:value&#10;another_key:another_value"></textarea>
+        </div>
+
+        <div id="tab-headers" class="pane">
+          <div class="kv-toolbar">
+            <div class="grow"></div>
+            <button class="ghost bulk-edit-toggle" data-bulk="headers">Bulk Edit</button>
+          </div>
+          <div class="kv-table-view" data-view="headers-table">
+            <table class="kv">
+              <thead><tr><th></th><th>Key</th><th>Value</th><th>Description</th><th></th></tr></thead>
+              <tbody id="headers-body"></tbody>
+            </table>
+            <button class="ghost" data-add="headers">+ Add</button>
+          </div>
+          <textarea class="kv-bulk-textarea hidden" data-bulk-text="headers" placeholder="Content-Type: application/json&#10;Authorization: Bearer xyz"></textarea>
+        </div>
+
+        <div id="tab-auth" class="pane">
+          <div class="auth-toolbar">
+            <label>Type</label>
+            <select id="auth-type">
+              <option value="none">No Auth</option>
+              <option value="basic">Basic Auth</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="apikey">API Key</option>
+            </select>
+            <span class="muted-help" id="auth-hint"></span>
+          </div>
+
+          <div id="auth-fields-basic" class="auth-fields hidden">
+            <label>Username</label>
+            <input id="auth-basic-user" type="text" placeholder="Username" />
+            <label>Password</label>
+            <input id="auth-basic-pass" type="password" placeholder="Password" />
+          </div>
+
+          <div id="auth-fields-bearer" class="auth-fields hidden">
+            <label>Token</label>
+            <input id="auth-bearer-token" type="text" placeholder="Bearer token (sent as: Authorization: Bearer <token>)" />
+          </div>
+
+          <div id="auth-fields-apikey" class="auth-fields hidden">
+            <label>Key</label>
+            <input id="auth-apikey-key" type="text" placeholder="e.g. X-API-Key" />
+            <label>Value</label>
+            <input id="auth-apikey-value" type="text" placeholder="API key value" />
+            <label>Add to</label>
+            <select id="auth-apikey-in">
+              <option value="header">Header</option>
+              <option value="query">Query Params</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="tab-body" class="pane">
+          <div class="body-toolbar">
+            <select id="body-type">
+              <option value="none">None</option>
+              <option value="json">JSON</option>
+              <option value="xml">XML</option>
+              <option value="html">HTML</option>
+              <option value="javascript">JavaScript</option>
+              <option value="text">Text</option>
+              <option value="urlencoded">x-www-form-urlencoded</option>
+              <option value="formdata">form-data</option>
+              <option value="binary">binary</option>
+            </select>
+            <button id="format-body" class="ghost">Format</button>
+          </div>
+          <div id="body-editor" class="code editor-host"></div>
+          <div id="body-kv-toolbar" class="kv-toolbar hidden">
+            <div class="grow"></div>
+            <button class="ghost bulk-edit-toggle" data-bulk="body">Bulk Edit</button>
+          </div>
+          <div id="body-kv-view" data-view="body-table">
+            <table id="body-kv-table" class="kv hidden">
+              <thead><tr><th></th><th>Key</th><th>Value</th><th>Description</th><th></th></tr></thead>
+              <tbody id="body-kv-body"></tbody>
+            </table>
+            <button id="body-kv-add" class="ghost hidden">+ Add</button>
+          </div>
+          <textarea class="kv-bulk-textarea hidden" data-bulk-text="body" placeholder="key:value&#10;another_key:another_value"></textarea>
+
+          <!-- form-data: text + file rows -->
+          <table id="formdata-table" class="kv hidden">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Key</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Description</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="formdata-body"></tbody>
+          </table>
+          <button id="formdata-add" class="ghost hidden">+ Add</button>
+
+          <!-- binary: single file picker -->
+          <div id="binary-body" class="binary-body hidden">
+            <button id="binary-pick" class="ghost">Choose file…</button>
+            <span id="binary-info" class="muted-help">No file selected.</span>
+            <button id="binary-clear" class="ghost hidden">Clear</button>
+          </div>
+        </div>
+
+        <div id="tab-tests" class="pane">
+          <div class="tests-toolbar">
+            <span class="muted-help">
+              Write JS that runs after the response. Use <code>pm.test()</code>, <code>pm.expect()</code>,
+              and <code>pm.environment.set()</code> to chain requests.
+            </span>
+            <div class="grow"></div>
+            <button id="tests-snippet" class="ghost" title="Insert a starter snippet">Insert example</button>
+          </div>
+          <div id="tests-editor" class="code editor-host"></div>
+        </div>
+        </div>
+
+        <div id="split-handle" class="split-handle" title="Drag to resize"></div>
+
+        <div class="response-panel" id="response-panel">
+          <div id="response-loader" class="response-loader hidden">
+            <div class="spinner"></div>
+            <div id="response-timer" class="response-timer">0 ms</div>
+            <button id="cancel-request" class="ghost">Cancel</button>
+          </div>
+          <div class="response-meta">
+            <span id="status-pill" class="pill">—</span>
+            <span id="time-pill" class="pill ghost-pill">—</span>
+            <span id="size-pill" class="pill ghost-pill">—</span>
+            <div class="grow"></div>
+            <button id="format-response" class="ghost">Format</button>
+            <button id="copy-response" class="ghost">Copy</button>
+          </div>
+          <div class="tabs">
+            <button class="tab active" data-rtab="body">Body</button>
+            <button class="tab" data-rtab="headers">Response Headers</button>
+            <button class="tab" data-rtab="tests" id="rtab-tests-btn">Test Results</button>
+          </div>
+          <div id="rtab-body" class="pane active">
+            <div id="response-truncation" class="response-truncation hidden">
+              <span id="truncation-info"></span>
+              <button id="show-full" class="ghost">Show full</button>
+              <button id="save-response" class="ghost">Save to file</button>
+            </div>
+            <div id="response-body" class="code response editor-host"></div>
+          </div>
+          <div id="rtab-headers" class="pane">
+            <pre id="response-headers" class="code response"></pre>
+          </div>
+          <div id="rtab-tests" class="pane">
+            <div id="test-results" class="test-results"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modals -->
+    <dialog id="env-dialog" class="modal">
+      <h3>Environments</h3>
+      <div class="env-editor">
+        <ul id="env-list" class="tree"></ul>
+        <button id="env-new" class="ghost block">+ New environment</button>
+        <hr />
+        <label>Name</label>
+        <input id="env-name" />
+        <table class="kv">
+          <thead><tr><th></th><th>Variable</th><th>Value</th><th>Description</th><th></th></tr></thead>
+          <tbody id="env-vars"></tbody>
+        </table>
+        <button class="ghost" id="env-add-var">+ Add variable</button>
+      </div>
+      <div class="modal-actions">
+        <button id="env-delete" class="danger">Delete</button>
+        <div class="grow"></div>
+        <button id="env-close" class="ghost">Close</button>
+        <button id="env-save" class="primary">Save</button>
+      </div>
+    </dialog>
+
+    <dialog id="proxy-dialog" class="modal">
+      <h3>Proxy</h3>
+      <label class="check-row">
+        <input type="checkbox" id="proxy-enabled" />
+        <span>Enable proxy for outbound requests</span>
+      </label>
+      <label>Proxy URL</label>
+      <input id="proxy-url" placeholder="http://host:port  ·  https://host:port  ·  socks5://user:pass@host:port" />
+      <small class="muted-help">
+        Schemes: <code>http</code>, <code>https</code>, <code>socks4</code>, <code>socks5</code>, <code>socks5h</code>.
+        Embed credentials in the URL: <code>scheme://user:pass@host:port</code>.
+      </small>
+      <label>Bypass (comma-separated, supports <code>*.example.com</code>)</label>
+      <input id="proxy-bypass" placeholder="localhost, 127.0.0.1, *.internal.corp" />
+      <div class="modal-actions">
+        <button id="proxy-cancel" class="ghost">Cancel</button>
+        <div class="grow"></div>
+        <button id="proxy-save" class="primary">Save</button>
+      </div>
+    </dialog>
+
+    <dialog id="settings-dialog" class="modal modal-lg">
+      <header class="modal-header">
+        <h3>Settings</h3>
+        <button id="settings-close" class="icon-btn" title="Close">×</button>
+      </header>
+
+      <div class="settings-body">
+        <section class="settings-section">
+          <h4>General</h4>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Open requests in new tab</div>
+              <div class="setting-desc">When opening a saved request or history item, create a new tab instead of replacing the current one.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="open-in-new-tab" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Confirm before overwriting saved request</div>
+              <div class="setting-desc">When on, ⌘S / Ctrl+S asks before replacing the current saved version. Off = silent overwrite (Postman default). ⌘⇧S always opens Save As regardless.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="confirm-overwrite" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h4>Appearance</h4>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Syntax highlighting in request body</div>
+              <div class="setting-desc">Color JSON / XML / HTML / JavaScript bodies and the Tests script. Off = plain text.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="highlight-request-body" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Syntax highlighting in response body</div>
+              <div class="setting-desc">Color the response payload by detected content type. Off = plain text.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="highlight-response-body" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h4>Performance</h4>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Render limit</div>
+              <div class="setting-desc">Responses larger than this are truncated in the editor. Full body is kept in memory and can be saved to file.</div>
+            </div>
+            <div class="setting-control">
+              <input id="render-limit-mb" type="number" min="0.1" step="0.1" />
+              <span class="unit">MB</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">History entries</div>
+              <div class="setting-desc">Most recent N entries shown in the History sidebar.</div>
+            </div>
+            <div class="setting-control">
+              <input id="history-count" type="number" min="1" max="200" step="1" />
+              <span class="unit">items</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h4>Workspace</h4>
+          <button id="open-env" class="setting-action">
+            <span class="setting-action-label">Environments</span>
+            <span class="setting-action-desc">Create variables and switch between dev / qa / prod URLs.</span>
+            <span class="chevron">›</span>
+          </button>
+          <button id="open-proxy" class="setting-action">
+            <span class="setting-action-label">Proxy <span id="proxy-status-pill" class="status-dot hidden"></span></span>
+            <span class="setting-action-desc">Route outbound requests through HTTP, HTTPS, or SOCKS proxy.</span>
+            <span class="chevron">›</span>
+          </button>
+          <button id="open-import" class="setting-action">
+            <span class="setting-action-label">Import Postman</span>
+            <span class="setting-action-desc">Bring in a Postman v2.1 collection or environment file.</span>
+            <span class="chevron">›</span>
+          </button>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="prompt-dialog" class="modal">
+      <h3 id="prompt-title">Input</h3>
+      <label id="prompt-label">Value</label>
+      <input id="prompt-input" />
+      <div class="modal-actions">
+        <button id="prompt-cancel" class="ghost">Cancel</button>
+        <div class="grow"></div>
+        <button id="prompt-confirm" class="primary">OK</button>
+      </div>
+    </dialog>
+
+    <dialog id="text-dialog" class="modal">
+      <h3 id="text-title">Text</h3>
+      <textarea id="text-content" class="code" readonly style="min-height:180px"></textarea>
+      <div class="modal-actions">
+        <button id="text-close" class="ghost">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="confirm-close-dialog" class="modal">
+      <h3 id="confirm-close-title">Unsaved changes</h3>
+      <p id="confirm-close-msg" style="color: var(--muted); font-size: 13px; margin: 0 0 12px 0; line-height: 1.5;">
+        This request has unsaved changes. Save before closing?
+      </p>
+      <div class="modal-actions">
+        <button id="confirm-close-cancel" class="ghost">Cancel</button>
+        <div class="grow"></div>
+        <button id="confirm-close-discard" class="ghost">Discard</button>
+        <button id="confirm-close-save" class="primary">Save</button>
+      </div>
+    </dialog>
+
+    <dialog id="confirm-dialog" class="modal">
+      <h3 id="confirm-dialog-title">Confirm</h3>
+      <p id="confirm-dialog-msg" style="color: var(--muted); font-size: 13px; margin: 0 0 12px 0; line-height: 1.5;"></p>
+      <div class="modal-actions">
+        <button id="confirm-dialog-cancel" class="ghost">Cancel</button>
+        <div class="grow"></div>
+        <button id="confirm-dialog-ok" class="primary">OK</button>
+      </div>
+    </dialog>
+
+    <dialog id="save-dialog" class="modal">
+      <h3>Save request</h3>
+      <label>Name</label>
+      <input id="save-name" />
+      <label>Collection</label>
+      <select id="save-collection"></select>
+      <div class="modal-actions">
+        <button id="save-cancel" class="ghost">Cancel</button>
+        <button id="save-confirm" class="primary">Save</button>
+      </div>
+    </dialog>
+
+    <!-- Common HTTP request header names for autocomplete on the Headers tab -->
+    <datalist id="header-suggestions">
+      <option value="Accept"></option>
+      <option value="Accept-Charset"></option>
+      <option value="Accept-Encoding"></option>
+      <option value="Accept-Language"></option>
+      <option value="Authorization"></option>
+      <option value="Cache-Control"></option>
+      <option value="Connection"></option>
+      <option value="Content-Type"></option>
+      <option value="Content-Length"></option>
+      <option value="Content-Encoding"></option>
+      <option value="Cookie"></option>
+      <option value="DNT"></option>
+      <option value="Host"></option>
+      <option value="If-Match"></option>
+      <option value="If-None-Match"></option>
+      <option value="If-Modified-Since"></option>
+      <option value="If-Unmodified-Since"></option>
+      <option value="Origin"></option>
+      <option value="Pragma"></option>
+      <option value="Range"></option>
+      <option value="Referer"></option>
+      <option value="User-Agent"></option>
+      <option value="X-Api-Key"></option>
+      <option value="X-Auth-Token"></option>
+      <option value="X-CSRF-Token"></option>
+      <option value="X-Forwarded-For"></option>
+      <option value="X-Requested-With"></option>
+    </datalist>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

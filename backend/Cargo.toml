@@ -1,0 +1,32 @@
+[package]
+name = "postie-backend"
+version = "1.2.0"
+edition = "2021"
+
+[[bin]]
+name = "postie-backend"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "gzip", "brotli", "deflate", "stream", "multipart", "socks"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+base64 = "0.22"
+flate2 = "1"
+brotli = "7"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

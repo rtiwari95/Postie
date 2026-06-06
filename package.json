@@ -1,0 +1,116 @@
+{
+  "name": "postie",
+  "version": "1.2.0",
+  "description": "Postie — a Postman-like API client. Electron + Rust.",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build:backend": "cd backend && cargo build --release",
+    "build:renderer": "esbuild renderer/js/editor-entry.js --bundle --format=esm --outfile=renderer/js/editor.bundle.js --target=es2022",
+    "watch:renderer": "esbuild renderer/js/editor-entry.js --bundle --format=esm --outfile=renderer/js/editor.bundle.js --target=es2022 --watch",
+    "rename:electron": "node scripts/rename-electron-bundle.js",
+    "postinstall": "npm run rename:electron",
+    "start": "npm run build:backend && npm run build:renderer && electron .",
+    "dev": "npm run build:renderer && electron .",
+    "package": "electron-builder"
+  },
+  "author": "Postie",
+  "license": "MIT",
+  "homepage": "https://github.com/postie/postie",
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/search": "^6.7.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "@lezer/highlight": "^1.2.3",
+    "codemirror": "^6.0.2",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.28.0"
+  },
+  "build": {
+    "appId": "com.postie.app",
+    "productName": "Postie",
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "!renderer/js/editor-entry.js",
+      "assets/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "arm64"
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extraResources": [
+        {
+          "from": "backend/target/release/postie-backend",
+          "to": "postie-backend"
+        }
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "synopsis": "Postman-like API client",
+      "description": "Postie — a Postman-like API client built with Electron and Rust.",
+      "maintainer": "Postie <postie@local>",
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "deb",
+          "arch": "x64"
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "backend/target/x86_64-unknown-linux-musl/release/postie-backend",
+          "to": "postie-backend"
+        }
+      ]
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": "x64" },
+        { "target": "portable", "arch": "x64" }
+      ],
+      "extraResources": [
+        {
+          "from": "backend/target/x86_64-pc-windows-gnu/release/postie-backend.exe",
+          "to": "postie-backend.exe"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Postie"
+    },
+    "portable": {
+      "artifactName": "Postie-${version}-portable.exe"
+    },
+    "dmg": {
+      "title": "Postie ${version}",
+      "writeUpdateInfo": false
+    }
+  },
+  "dependencies": {
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-javascript": "^6.2.5"
+  }
+}
